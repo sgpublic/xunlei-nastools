@@ -1,79 +1,65 @@
 // 这部分代码根据手册修改 -- start
 function GetXunLeiToken(e) {
-    return Q8e(e)
+    return rV(e)
 }
 
-var R8e = GetTokenInternal
+var DRe = GetTokenInternal
 // 这部分代码根据手册修改 -- end
 
 
 // 这部分代码从迅雷网站js脚本中拷贝 -- start
-function Q8e(e) {
-    return e + "." + R8e(e + x8e() + F8e() + B8e() + V8e() + z8e() + j8e() + H8e() + W8e() + U8e() + K8e() + q8e() + G8e() + Y8e() + X8e() + Z8e() + J8e())
-}
-
-
-function x8e() {
+function NRe() {
     return ""
 }
-
-function F8e() {
-    return "lvmpxxflpbehvdrmafnjpjexoyggulwblebooxfuekhbrzakislubolbrjplrphhhkozgvvtkgsdgwkwnqwalnhypnjkpmztfvqnsatfadtagokpwzmhuqnxogaxotbhaonkrjnwygzosnkghdgnsbdknpklypxrqjepapducejnsggtleyxjpwkwfhdlgfaicuakvbblqipuzxgienqitzhtygweimdpyizjciqjfkrmrucezicztupumjervxesntflxqovujxqccafkgcbbjnpancfmvwahqygwjfntftzmvjuhfdovmsrpudrzcldoqpluzyziyeusuinpigxlszvziqhrlegmrgngipzqizeujkzkvvxrpbaaozijakiltykiawrckprdcjxcoowpfwlisrrlvdcvamxeomowhnbifydcguzlnwpxtradezkuhamowbftcvgdxuwrnmusuqyaxicrfdbxqumkjkqjdwakmqhukpvsjsaihjhaqvoldgyvbuoyhgxcuptmmqumyxnnskoxwfyzpabgijmjydgreoqowufvgcnobfbebkhlmqunggwqtkmaiiodytckbmamzsntcxvzwfdcwhszgdtyddbtnyprdonxwccavuoaybkclldzbxyatactxmmvbjfyntwykjtdtmjjipcvdynthitqvdreudrxyozatctthymsinraxrfksaqwttqzlchxiiohcpabbwvhgkwpohnexeyhkanhmwrsutdxtcrdbceqedwbvrhfltrmimvufprntsmuccrfewlvfbnncmjddejlhptsftzsxudsmteyffondhhxffwnyxbpflbguasfmkxbwanhabisqwybbhuplzhbtpyeplzxtdhgmdcrjtuywqhsqngpbhtldewouuaxukwsdoosaigllarvczliyxqtbqxbivoclkpqpfmkwijrtllzouiicseggepbliffzfaxuadjmdtqnuejezliirrohx"
+function FRe() {
+    return "idbvrxjhrbzjjuyfkfdokrdcizdclpjjydsynoqyumcutwhpclnbmhcglwhkkovpwroqibazfcnaeayzgfqfelaywiomwyjnagnrrddmuexargwokjpwbikeprjolmnyqrusrlvzhpuyjnsrqmqstkisjbuexfyyxxzluuyxifamyerueuyrcnjnjejdzfirnbhocnmffibvtpclljmcqlukrbrptojadixndwajouvlpqpwimzbbyppdqxxxhovokyukgkxrayfuyocvspxmmgezpruqgqnbrrxlqvrppbzljpfnpcdjktuoegplnmgzaaeezkqcgzhbohygiimggkvezfsmbrtkdygmjmbxmgvzajkxrdpucquyvefuflvpzxixoutccgppkzvoosshhyuriwdgchymguwgvkoaedcgyjybyxmrlsdfhvmjcucpidjqidhqjnnnovfkxdkpfkfoedaqlhptgaceyueeqscjnwzomnypijnsyfqozpdcazvjvbxxaiybxbjizistxuqxtjixzpvrcqkfrcbfxjifemigcoppiggitjylsascaqgqozmurbfborpovagwmcpzpjugdthbzvrjhntovigecytyfraphdmaaojkijhnhhqdkscyshxbtmfycajpzmfhbmqvkrvmuestzgdwwisdwbfvcdyzg"
 }
-
-function B8e() {
-    return "lsdjsogxsihrzqlhwtlakyfnbavwwxxafjmtahknulwvfyeusjncatirnjgqtwrygxldbkvwvoywbzxtrcuvcugxwpatfofspxxdpgymfeieievdguaaqrdberqherpunypdbilheiujqobmvgntmpazuducjydggasjeapjjhzikftpjcuiktzgkesrredcszpdeinpknftomqest"
+function xRe() {
+    return "lywoqrspljeop"
 }
-
-function V8e() {
-    return "aaumxwaktqyzadrexgihtqmvcikuhqysmozyupxtxwlavyqurssjcapvrtukaiylhxevetqziazmtulqocpamefucghdvbknodtxyhxmdmjyrulvduriboqpqgjmsefezzshriassovdzcsdylnonbuprrwgijitatwcxxrqxzqiqipdjrnjjpvglzmanspsrcidmuczevmx"
+function RRe() {
+    return "ghuxmhchesxqwlwwwjamsyrpyraelwepuvkwjuacmfacpbjqteeqdfquphhltofphsffjskkvmxtlxsjtakactyvhvjgochfkfxuzyyguxzcaedwgvrbtcomuwowpqvhrlpruavwyoaoawttjexduuroqmpbfrepkeybtppmdsmforqwhdpdeafpqmuhrkhccqkqsbtrzszfwohcqsowgyehscfzlfygearpolgifwcipdmgcydukutomtmplitahhdhikujprbraszvjaponzlhbjvsxvawtkdlgmegeaqvsrgwoblenrqdiomqovnxwgosqhassfqxmrljgskicqfwtxyzalsbzbdrqlgdinqgqdfruhpcidbqwfwgvyefaepvxjuqvhs"
 }
-
-function z8e() {
-    return "duwsredjjdjywyaovrtjzzybfdwzeappiuvdcefwvwzgwxqrflmavfefpzwveemztoizwzpfpecmnvzzsubnmwqqmzfnuntfyvekmeltiqzahdgdatbbuifmininkzevspjgynzhxljxeucvmudetztdumeheyenhkuvntasuyejegnvbccyphdvzewyyhmqbvwanrfyebqhjjeyknvddabsbgbhdnolynkumsagprifdcpmuajcxjcnaoqtowndylhsvsedzhasnxujimoqf"
+function LRe() {
+    return "fcbdlozmubsxlkpvviangcwxusuchhffqbwzwahyoymqxjuzhoihstqfiabjnumyuflywjkwqqlkrcrkjhwwnsejsqprbiytufgfeuqcggdusgapbboqdpjdoaxuzsojffqztpokphaydlpaawhzhylsjefgaamnaqzvblkwikhqmbgrlzmvqhnzgsjzayeprliqlourmowxrchqrtsyjiahopwpjgqnucohokrfnhhswuartcmkzmwdyoixfvozlzwgpjemkanvbpukdtzqcdtwnmlusphagsajggewzfqpbcil"
 }
-
-function j8e() {
-    return "tqjgfsbjtefgkgqmofonkzedeecsgovvsvixznhfsofdsbbdwnpelhqwusndgmnsiopwbhwoolcfymloiwxzvywveseuhxqsoxcrkmrrqhjxksieyisbksfyqdurkabykrwdxvu"
+function BRe() {
+    return "tsibbbxtpeoscmiorljeffkrykofdbaankashzytiilzaxuxkfshxjpzdmzvhnxzqljnhisjnnvppcsxdsjcxgwehofmklevahmktbrwciajxvkuogdjhrehqhamquflyxoxrbuzklihvivggglspgczbslpllklsreixkjbzoafeidyibknhjxgunsdikbakhuksqfulzdfwwknjcaayspaihwdxlzefymtuvpwuraxngfromwiwmfbyv"
 }
-
-function H8e() {
-    return "nut"
+function VRe() {
+    return "jznhn"
 }
-
-function W8e() {
-    return "cydyscbymlgzyposddxugjmruzrrtfhyaljwtizixvozfjsjeyzyvpje"
+function jRe() {
+    return "yarctazbvmcltxokotwxzvairtkxeghigjphgwbmfgzweaclxcgflgydsmsfojpspfcsybtgjrxogcmsnsmcfngyyhrvsybtr"
 }
-
-function U8e() {
-    return "jjmsqhivp"
+function HRe() {
+    return "ldztnnleeapkyobyalxatvphmfsjloxltccqtdawxfybmofrqwckjzdsfnfannpwhmwgzqbqzymczruh"
 }
-
-function K8e() {
-    return "kndbxkanogsvncqbeiaypxhqnevdrmsygfvmwojvbqvgrxifh"
+function zRe() {
+    return "qaqpxduqarmdqladmhsrdkbgkrtsvuxtibuvncmnekhpyunnmvxqhdrvkjgwbtsipngpzomtcigjrmookykfqottquk"
 }
-
-function q8e() {
-    return "vhgrfrndrzsgiallapebszdcsmjsxr"
+function URe() {
+    return "sfvmzsgqivrwguluzfxxvifyodjvyfb"
 }
-
-function G8e() {
-    return "mgovybaiulwsovlmmkh"
+function WRe() {
+    return "hcrmylfxnwhafwxlmxt"
 }
-
-function Y8e() {
-    return "jpeatwpkxy"
+function qRe() {
+    return "mmoqbwhgzuiwxmpdi"
 }
-
-function X8e() {
-    return "grs"
+function KRe() {
+    return "pqzxlqwfp"
 }
-
-function Z8e() {
-    return "txscsv"
+function GRe() {
+    return "fozeh"
 }
-
-function J8e() {
-    return "d"
+function YRe() {
+    return "akxdxaf"
+}
+function XRe() {
+    return "dyczfcv"
+}
+function rV(e) {
+    return e + "." + DRe(e + NRe() + FRe() + xRe() + RRe() + LRe() + BRe() + VRe() + jRe() + HRe() + zRe() + URe() + WRe() + qRe() + KRe() + GRe() + YRe() + XRe())
 }
 // 这部分代码从迅雷网站js脚本中拷贝 -- end
