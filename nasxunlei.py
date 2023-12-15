@@ -3,6 +3,7 @@ import json
 import os.path
 import sys
 from enum import Enum
+from types import SimpleNamespace
 
 import log
 from app.conf import ModuleConf
@@ -19,10 +20,32 @@ for dep in third_party_nas_xunlei:
 
 import js2py
 
-
 class Downloader_NasXunlei(Enum):
     NAS_XUNLEI = "NAS 迅雷"
 
+class NasXunlei_Status(str, Enum):
+    """enum for torrent status"""
+
+    PAUSED = "PHASE_TYPE_PAUSED"
+    DOWNLOAD_PENDING = "PHASE_TYPE_PENDING"
+    DOWNLOADING = "PHASE_TYPE_RUNNING"
+    COMPLETE = "PHASE_TYPE_COMPLETE"
+    ERROR = "PHASE_TYPE_ERROR"
+
+    @property
+    def stopped(self) -> bool:
+        return self == "paused" or self == "complete" or self == "error"
+
+    @property
+    def download_pending(self) -> bool:
+        return self == "download pending"
+
+    @property
+    def downloading(self) -> bool:
+        return self == "downloading"
+
+    def __str__(self) -> str:
+        return self.value
 
 _default_port = 5055
 _nas_xunlei_icon = (
@@ -134,7 +157,7 @@ class NasXunlei(_IDownloadClient):
             log.error(f"【{self.client_name}】{self.name} 获取状态出错：{str(e)}")
             return False
 
-    def get_torrents(self, ids, status, tag):
+    def get_torrents(self, ids=None, status=None, tag=None):
         """
         按条件读取种子信息
         :param ids: 种子ID，单个ID或者ID列表
@@ -145,26 +168,40 @@ class NasXunlei(_IDownloadClient):
         if not self._nxc:
             return [], True
         try:
-            tasks = self._nxc.get_torrents(ids=ids, status=status)
-            if not tasks:
+            all_tasks = self._nxc.get_torrents(ids=ids, status=status)
+            if not all_tasks:
                 return None, True
             else:
-                return tasks, False
+                return all_tasks, False
         except Exception as err:
             log.error(f"【{self.client_name}】{self.name} 获取种子列表出错：{str(err)}")
             return [], True
 
     def get_downloading_torrents(self, ids, tag):
-        """
-        读取下载中的种子信息，发生错误时需返回None
-        """
-        pass
+        if not self._nxc:
+            return [], True
+        try:
+            all_tasks = self._nxc.get_downloading_torrents(ids=ids)
+            if not all_tasks:
+                return None, True
+            else:
+                return all_tasks, False
+        except Exception as err:
+            log.error(f"【{self.client_name}】{self.name} 获取正在下载种子列表出错：{str(err)}")
+            return [], True
 
     def get_completed_torrents(self, ids, tag):
-        """
-        读取下载完成的种子信息，发生错误时需返回None
-        """
-        pass
+        if not self._nxc:
+            return [], True
+        try:
+            all_tasks = self._nxc.get_complete_torrents(ids=ids)
+            if not all_tasks:
+                return None, True
+            else:
+                return all_tasks, False
+        except Exception as err:
+            log.error(f"【{self.client_name}】{self.name} 获取已完成种子列表出错：{str(err)}")
+            return [], True
 
     def get_files(self, tid):
         """
@@ -173,12 +210,7 @@ class NasXunlei(_IDownloadClient):
         pass
 
     def set_torrents_status(self, ids, tags=None):
-        """
-        迁移完成后设置种子标签为 已整理
-        :param ids: 种子ID列表
-        :param tags: 种子标签列表
-        """
-        pass
+        return False
 
     def get_transfer_task(self, tag, match_path=None):
         """
@@ -194,7 +226,7 @@ class NasXunlei(_IDownloadClient):
         """
         pass
 
-    def add_torrent(self, **kwargs):
+    def add_torrent(self, content, download_dir=None, **kwargs):
         """
         添加下载任务
         """
@@ -213,10 +245,10 @@ class NasXunlei(_IDownloadClient):
         pass
 
     def delete_torrents(self, delete_file, ids):
-        """
-        删除种子
-        """
-        pass
+        if not self._nxc:
+            return False
+        try:
+            self._nxc.delete_torrents
 
     def get_download_dirs(self):
         """
@@ -281,7 +313,7 @@ class NasXunleiProvider:
 
     def check_server_now(self):
         resp = RequestUtils().get(url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/device/now")
-        return int(json.loads(resp.text).get('now'))
+        return int(json.loads(str(resp)).get('now'))
 
     def info_watch(self):
         try:
@@ -291,37 +323,105 @@ class NasXunleiProvider:
                     "pan_auth": self._create_xunlei_token()
                 }
             )
-            return json.loads(resp).get("client_version")
+            return json.loads(str(resp)).get("client_version")
         except Exception as e:
             return None
+
+    def _get_torrents(self, filters):
+        filters["type"] = {
+            "in": "user#download-url,user#download"
+        }
+        resp = RequestUtils(headers=self.basic_auth).get(
+            url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/tasks",
+            params={
+                "pan_auth": self._create_xunlei_token(),
+                "filters": json.dumps(filters)
+            }
+        )
+        all_tasks = []
+        for task in json.loads(str(resp)).get("tasks"):
+            task_param = task.get("params")
+
+            task_info = SimpleNamespace()
+            task_info.type = task.get("type")
+            task_info.space = task.get("space")
+            task_info.id = task.get("id")
+            task_info.percent_done = int(task.get("progress")) / 100
+            match task.get("phase"):
+                case "PHASE_TYPE_RUNNING":
+                    task_info.status = NasXunlei_Status.DOWNLOADING
+                case "PHASE_TYPE_PAUSED":
+                    task_info.status = NasXunlei_Status.PAUSED
+                case "PHASE_TYPE_PENDING":
+                    task_info.status = NasXunlei_Status.DOWNLOAD_PENDING
+                case "PHASE_TYPE_ERROR":
+                    task_info.status = NasXunlei_Status.ERROR
+                case "PHASE_TYPE_COMPLETE":
+                    task_info.status = NasXunlei_Status.COMPLETE
+            task_info.hashString = task_param.get("info_hash")
+            task_info.download_dir = task_param.get("real_path")
+
+            all_tasks.append(task_info)
+
+        return all_tasks
 
     def get_torrents(self, ids, status):
-        try:
-            resp = RequestUtils(headers=self.basic_auth).get(
-                url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/tasks",
-                params={
-                    "pan_auth": self._create_xunlei_token()
-                }
-            )
-            tasks = []
-            for task in json.loads(resp).get("tasks"):
-                task_param = task.get("params")
+        filter = {}
+        if ids is list:
+            filter["id"] = {
+                "in": ids.join(",")
+            }
+        elif ids is str:
+            filter["id"] = {
+                "in": ids
+            }
+        if status is not None and len(status) > 0:
+            filter["phase"] = {
+                "in": status.join(",")
+            }
+        return self._get_torrents(filters=filter)
 
-                task_info = {}
-                task_info.id = task.get("id")
-                task_info.percent_done = int(task.get("progress")) / 100
-                task_info.status = {}
-                task_info.hashString = task_param.get("info_hash")
-                task_info.download_dir = task_param.get("real_path")
+    def get_complete_torrents(self, ids):
+        filter = {}
+        if ids is list:
+            filter["id"] = {
+                "in": ids.join(",")
+            }
+        elif ids is str:
+            filter["id"] = {
+                "in": ids
+            }
+        filter["phase"] = {
+            "in": "PHASE_TYPE_COMPLETE"
+        }
+        return self._get_torrents(filters=filter)
 
-                tasks.append(task_info)
+    def get_downloading_torrents(self, ids):
+        filter = {}
+        if ids is list:
+            filter["id"] = {
+                "in": ids.join(",")
+            }
+        elif ids is str:
+            filter["id"] = {
+                "in": ids
+            }
+        filter["phase"] = {
+            "in": "PHASE_TYPE_PENDING,PHASE_TYPE_RUNNING,PHASE_TYPE_PAUSED,PHASE_TYPE_ERROR"
+        }
+        return self._get_torrents(filters=filter)
 
-            return tasks
-        except Exception as e:
-            return None
+    def add_torrent(self, content, download_dir=None):
+        resp = RequestUtils(headers=self.basic_auth).post(
+            url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/resource/list?pan_auth={self._create_xunlei_token()}",
+            json={
+                "urls": content,
+            }
+        )
 
     def _create_xunlei_token(self):
-        return self.__xunlei_get_token.call("GetXunLeiToken", self.check_server_now())
+        token = self.__xunlei_get_token.GetXunLeiToken(self.check_server_now())
+        return token
 
     def __init__(self, host, port, username, password):
         self.host = host
@@ -538,5 +638,7 @@ function GetTokenInternal(a, i) {
         """ + f"""
         {__xunlei_get_token_js_external}
         """
-        self.__xunlei_get_token = js2py.compile(__xunlei_get_token_js)
+        context = js2py.EvalJs()
+        context.execute(__xunlei_get_token_js)
+        self.__xunlei_get_token = context
 
