@@ -3,4 +3,4 @@
 	url = git@github.com:PiotrDabkowski/Js2Py.git
 [submodule "third_party/pyjsparser"]
 	path = third_party/pyjsparser
-	url = git@github.com:mvantellingen/pyjsparser.git
+	url = git@github.com:PiotrDabkowski/pyjsparser.git

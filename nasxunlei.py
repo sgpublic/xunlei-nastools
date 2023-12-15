@@ -2,21 +2,22 @@ import base64
 import json
 import os.path
 import sys
-from abc import ABCMeta
 from enum import Enum
 
 import log
 from app.conf import ModuleConf
 from app.downloader.client._base import _IDownloadClient
 from app.utils import PathUtils, RequestUtils
-
 from config import Config
 
-try:
-    import execjs
-except ModuleNotFoundError:
-    sys.path.append(os.path.join(Config().get_root_path(), "third_party", "PyExecJS").replace("\\", "/"))
-    import execjs
+third_party_nas_xunlei = [
+    "pyjsparser",
+    "Js2Py"
+]
+for dep in third_party_nas_xunlei:
+    sys.path.append(os.path.join(Config().get_root_path(), "third_party_nas_xunlei", dep).replace("\\", "/"))
+
+import js2py
 
 
 class Downloader_NasXunlei(Enum):
@@ -537,5 +538,5 @@ function GetTokenInternal(a, i) {
         """ + f"""
         {__xunlei_get_token_js_external}
         """
-        self.__xunlei_get_token = execjs.compile(__xunlei_get_token_js)
+        self.__xunlei_get_token = js2py.compile(__xunlei_get_token_js)
 
