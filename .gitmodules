@@ -1,0 +1,3 @@
+[submodule "PyExecJS"]
+	path = PyExecJS
+	url = git@github.com:doloopwhile/PyExecJS.git
