@@ -12,6 +12,6 @@
 
 ### 食用方法
 
-1. 将本项目 `third_party` 目录映射到 nas-tools 容器的 `/nas-tools/third_party_nas_xunlei。
+1. 将本项目 `third_party` 目录映射到 nas-tools 容器的 `/nas-tools/third_party_nas_xunlei`。
 2. 将本项目 `nasxunlei.py` 文件映射到 nas-tools 容器的 `/nas-tools/app/downloader/client/nasxunlei.py`。
 3. 重启 nas-tools，enjoy！
