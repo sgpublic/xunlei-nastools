@@ -598,7 +598,6 @@ class NasXunleiProvider:
                         "limit": 200,
                     }
                 )
-                print(f"dirs: {dirs}")
                 if parent_id == "":
                     parent_id = dirs['files'][0]['id']
                     continue
@@ -752,13 +751,13 @@ class NasXunleiProvider:
     def _get(self, url, params=None, with_auth=True):
         if params is None:
             params = {}
+        headers = dict(**self.common_header)
         if with_auth:
             xtoken = self._create_xunlei_token()
             params["pan_auth"] = xtoken
-            headers = dict(**self.common_header)
             headers["pan-auth"] = xtoken
         params["device_space"] = ""
-        resp = RequestUtils(headers=self.common_header).get(
+        resp = RequestUtils(headers=headers).get(
             url=f"{self.host}{url}",
             params=params
         )
