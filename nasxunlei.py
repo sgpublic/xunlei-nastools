@@ -745,78 +745,6 @@ class NasXunleiProvider:
         # https://github.com/opennaslab/kubespider/blob/f55eab6a931d1851d5cbe2b6467d7dde96bffdef/.config/dependencies/xunlei_download_provider/get_token.js
         xunlei_get_token = os.path.join(Config().get_config_path(), "xunlei_get_token.js")
         __xunlei_get_token_js_external = """
-        // 这部分代码根据手册修改 -- start
-function GetXunLeiToken(e) {
-    return rV(e)
-}
-
-var DRe = GetTokenInternal
-// 这部分代码根据手册修改 -- end
-
-
-// 这部分代码从迅雷网站js脚本中拷贝 -- start
-function NRe() {
-    return ""
-}
-function FRe() {
-    return "idbvrxjhrbzjjuyfkfdokrdcizdclpjjydsynoqyumcutwhpclnbmhcglwhkkovpwroqibazfcnaeayzgfqfelaywiomwyjnagnrrddmuexargwokjpwbikeprjolmnyqrusrlvzhpuyjnsrqmqstkisjbuexfyyxxzluuyxifamyerueuyrcnjnjejdzfirnbhocnmffibvtpclljmcqlukrbrptojadixndwajouvlpqpwimzbbyppdqxxxhovokyukgkxrayfuyocvspxmmgezpruqgqnbrrxlqvrppbzljpfnpcdjktuoegplnmgzaaeezkqcgzhbohygiimggkvezfsmbrtkdygmjmbxmgvzajkxrdpucquyvefuflvpzxixoutccgppkzvoosshhyuriwdgchymguwgvkoaedcgyjybyxmrlsdfhvmjcucpidjqidhqjnnnovfkxdkpfkfoedaqlhptgaceyueeqscjnwzomnypijnsyfqozpdcazvjvbxxaiybxbjizistxuqxtjixzpvrcqkfrcbfxjifemigcoppiggitjylsascaqgqozmurbfborpovagwmcpzpjugdthbzvrjhntovigecytyfraphdmaaojkijhnhhqdkscyshxbtmfycajpzmfhbmqvkrvmuestzgdwwisdwbfvcdyzg"
-}
-function xRe() {
-    return "lywoqrspljeop"
-}
-function RRe() {
-    return "ghuxmhchesxqwlwwwjamsyrpyraelwepuvkwjuacmfacpbjqteeqdfquphhltofphsffjskkvmxtlxsjtakactyvhvjgochfkfxuzyyguxzcaedwgvrbtcomuwowpqvhrlpruavwyoaoawttjexduuroqmpbfrepkeybtppmdsmforqwhdpdeafpqmuhrkhccqkqsbtrzszfwohcqsowgyehscfzlfygearpolgifwcipdmgcydukutomtmplitahhdhikujprbraszvjaponzlhbjvsxvawtkdlgmegeaqvsrgwoblenrqdiomqovnxwgosqhassfqxmrljgskicqfwtxyzalsbzbdrqlgdinqgqdfruhpcidbqwfwgvyefaepvxjuqvhs"
-}
-function LRe() {
-    return "fcbdlozmubsxlkpvviangcwxusuchhffqbwzwahyoymqxjuzhoihstqfiabjnumyuflywjkwqqlkrcrkjhwwnsejsqprbiytufgfeuqcggdusgapbboqdpjdoaxuzsojffqztpokphaydlpaawhzhylsjefgaamnaqzvblkwikhqmbgrlzmvqhnzgsjzayeprliqlourmowxrchqrtsyjiahopwpjgqnucohokrfnhhswuartcmkzmwdyoixfvozlzwgpjemkanvbpukdtzqcdtwnmlusphagsajggewzfqpbcil"
-}
-function BRe() {
-    return "tsibbbxtpeoscmiorljeffkrykofdbaankashzytiilzaxuxkfshxjpzdmzvhnxzqljnhisjnnvppcsxdsjcxgwehofmklevahmktbrwciajxvkuogdjhrehqhamquflyxoxrbuzklihvivggglspgczbslpllklsreixkjbzoafeidyibknhjxgunsdikbakhuksqfulzdfwwknjcaayspaihwdxlzefymtuvpwuraxngfromwiwmfbyv"
-}
-function VRe() {
-    return "jznhn"
-}
-function jRe() {
-    return "yarctazbvmcltxokotwxzvairtkxeghigjphgwbmfgzweaclxcgflgydsmsfojpspfcsybtgjrxogcmsnsmcfngyyhrvsybtr"
-}
-function HRe() {
-    return "ldztnnleeapkyobyalxatvphmfsjloxltccqtdawxfybmofrqwckjzdsfnfannpwhmwgzqbqzymczruh"
-}
-function zRe() {
-    return "qaqpxduqarmdqladmhsrdkbgkrtsvuxtibuvncmnekhpyunnmvxqhdrvkjgwbtsipngpzomtcigjrmookykfqottquk"
-}
-function URe() {
-    return "sfvmzsgqivrwguluzfxxvifyodjvyfb"
-}
-function WRe() {
-    return "hcrmylfxnwhafwxlmxt"
-}
-function qRe() {
-    return "mmoqbwhgzuiwxmpdi"
-}
-function KRe() {
-    return "pqzxlqwfp"
-}
-function GRe() {
-    return "fozeh"
-}
-function YRe() {
-    return "akxdxaf"
-}
-function XRe() {
-    return "dyczfcv"
-}
-function rV(e) {
-    return e + "." + DRe(e + NRe() + FRe() + xRe() + RRe() + LRe() + BRe() + VRe() + jRe() + HRe() + zRe() + URe() + WRe() + qRe() + KRe() + GRe() + YRe() + XRe())
-}
-// 这部分代码从迅雷网站js脚本中拷贝 -- end
-        """
-        if os.path.exists(xunlei_get_token):
-            with open(xunlei_get_token) as f:
-                self.__xunlei_get_token_js_external = ""
-                for js_line in f.readlines():
-                    self.__xunlei_get_token_js_external = self.__xunlei_get_token_js_external + "\n" + js_line
-        __xunlei_get_token_js = """
 // 这部分代码不要动 -- start
 iB = {
     exports: {}
@@ -945,10 +873,78 @@ function GetTokenInternal(a, i) {
 }
 // 这部分代码不要动 -- end
 
-""" + f"""
-{__xunlei_get_token_js_external}
+// 部分代码根据手册修改 -- start
+function GetXunLeiToken(e) {
+    return rV(e)
+}
+
+var DRe = GetTokenInternal
+// 这部分代码根据手册修改 -- end
+
+// 这部分代码从迅雷网站js脚本中拷贝 -- start
+function NRe() {
+    return ""
+}
+function FRe() {
+    return "idbvrxjhrbzjjuyfkfdokrdcizdclpjjydsynoqyumcutwhpclnbmhcglwhkkovpwroqibazfcnaeayzgfqfelaywiomwyjnagnrrddmuexargwokjpwbikeprjolmnyqrusrlvzhpuyjnsrqmqstkisjbuexfyyxxzluuyxifamyerueuyrcnjnjejdzfirnbhocnmffibvtpclljmcqlukrbrptojadixndwajouvlpqpwimzbbyppdqxxxhovokyukgkxrayfuyocvspxmmgezpruqgqnbrrxlqvrppbzljpfnpcdjktuoegplnmgzaaeezkqcgzhbohygiimggkvezfsmbrtkdygmjmbxmgvzajkxrdpucquyvefuflvpzxixoutccgppkzvoosshhyuriwdgchymguwgvkoaedcgyjybyxmrlsdfhvmjcucpidjqidhqjnnnovfkxdkpfkfoedaqlhptgaceyueeqscjnwzomnypijnsyfqozpdcazvjvbxxaiybxbjizistxuqxtjixzpvrcqkfrcbfxjifemigcoppiggitjylsascaqgqozmurbfborpovagwmcpzpjugdthbzvrjhntovigecytyfraphdmaaojkijhnhhqdkscyshxbtmfycajpzmfhbmqvkrvmuestzgdwwisdwbfvcdyzg"
+}
+function xRe() {
+    return "lywoqrspljeop"
+}
+function RRe() {
+    return "ghuxmhchesxqwlwwwjamsyrpyraelwepuvkwjuacmfacpbjqteeqdfquphhltofphsffjskkvmxtlxsjtakactyvhvjgochfkfxuzyyguxzcaedwgvrbtcomuwowpqvhrlpruavwyoaoawttjexduuroqmpbfrepkeybtppmdsmforqwhdpdeafpqmuhrkhccqkqsbtrzszfwohcqsowgyehscfzlfygearpolgifwcipdmgcydukutomtmplitahhdhikujprbraszvjaponzlhbjvsxvawtkdlgmegeaqvsrgwoblenrqdiomqovnxwgosqhassfqxmrljgskicqfwtxyzalsbzbdrqlgdinqgqdfruhpcidbqwfwgvyefaepvxjuqvhs"
+}
+function LRe() {
+    return "fcbdlozmubsxlkpvviangcwxusuchhffqbwzwahyoymqxjuzhoihstqfiabjnumyuflywjkwqqlkrcrkjhwwnsejsqprbiytufgfeuqcggdusgapbboqdpjdoaxuzsojffqztpokphaydlpaawhzhylsjefgaamnaqzvblkwikhqmbgrlzmvqhnzgsjzayeprliqlourmowxrchqrtsyjiahopwpjgqnucohokrfnhhswuartcmkzmwdyoixfvozlzwgpjemkanvbpukdtzqcdtwnmlusphagsajggewzfqpbcil"
+}
+function BRe() {
+    return "tsibbbxtpeoscmiorljeffkrykofdbaankashzytiilzaxuxkfshxjpzdmzvhnxzqljnhisjnnvppcsxdsjcxgwehofmklevahmktbrwciajxvkuogdjhrehqhamquflyxoxrbuzklihvivggglspgczbslpllklsreixkjbzoafeidyibknhjxgunsdikbakhuksqfulzdfwwknjcaayspaihwdxlzefymtuvpwuraxngfromwiwmfbyv"
+}
+function VRe() {
+    return "jznhn"
+}
+function jRe() {
+    return "yarctazbvmcltxokotwxzvairtkxeghigjphgwbmfgzweaclxcgflgydsmsfojpspfcsybtgjrxogcmsnsmcfngyyhrvsybtr"
+}
+function HRe() {
+    return "ldztnnleeapkyobyalxatvphmfsjloxltccqtdawxfybmofrqwckjzdsfnfannpwhmwgzqbqzymczruh"
+}
+function zRe() {
+    return "qaqpxduqarmdqladmhsrdkbgkrtsvuxtibuvncmnekhpyunnmvxqhdrvkjgwbtsipngpzomtcigjrmookykfqottquk"
+}
+function URe() {
+    return "sfvmzsgqivrwguluzfxxvifyodjvyfb"
+}
+function WRe() {
+    return "hcrmylfxnwhafwxlmxt"
+}
+function qRe() {
+    return "mmoqbwhgzuiwxmpdi"
+}
+function KRe() {
+    return "pqzxlqwfp"
+}
+function GRe() {
+    return "fozeh"
+}
+function YRe() {
+    return "akxdxaf"
+}
+function XRe() {
+    return "dyczfcv"
+}
+function rV(e) {
+    return e + "." + DRe(e + NRe() + FRe() + xRe() + RRe() + LRe() + BRe() + VRe() + jRe() + HRe() + zRe() + URe() + WRe() + qRe() + KRe() + GRe() + YRe() + XRe())
+}
+// 这部分代码从迅雷网站js脚本中拷贝 -- end
+
 """
+        if os.path.exists(xunlei_get_token):
+            with open(xunlei_get_token) as f:
+                __xunlei_get_token_js_external = ""
+                for js_line in f.readlines():
+                    __xunlei_get_token_js_external = __xunlei_get_token_js_external + "\n" + js_line
         context = js2py.EvalJs()
-        context.execute(__xunlei_get_token_js)
+        context.execute(__xunlei_get_token_js_external)
         self.__xunlei_get_token = context
 
