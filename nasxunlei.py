@@ -12,7 +12,7 @@ from dateutil import parser
 import log
 from app.conf import ModuleConf
 from app.downloader.client._base import _IDownloadClient
-from app.utils import RequestUtils, StringUtils, ExceptionUtils, Torrent
+from app.utils import RequestUtils, StringUtils, Torrent
 from config import Config
 
 third_party_nas_xunlei = [
@@ -22,6 +22,7 @@ third_party_nas_xunlei = [
 for dep in third_party_nas_xunlei:
     sys.path.append(os.path.join(Config().get_root_path(), "third_party_nas_xunlei", dep).replace("\\", "/"))
 import js2py
+from feapder.utils.tools import urldecode
 
 
 class Downloader_NasXunlei(Enum):
@@ -531,7 +532,7 @@ class NasXunleiProvider:
 
     def add_torrent(self, content, download_dir):
         if not isinstance(content, str):
-            return self.add_torrent(Torrent.binary_data_to_magnet_link(content), download_dir)
+            return self.add_torrent(urldecode(Torrent.binary_data_to_magnet_link(content)), download_dir)
 
         target = self.info_watch().target
         try:
@@ -978,4 +979,3 @@ function rV(e) {
         context = js2py.EvalJs()
         context.execute(__xunlei_get_token_js_external)
         self.__xunlei_get_token = context
-
