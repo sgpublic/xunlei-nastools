@@ -1,5 +1,4 @@
 import base64
-import datetime
 import json
 import os.path
 import re
@@ -7,12 +6,13 @@ import sys
 from enum import Enum
 from types import SimpleNamespace
 
+import requests.models
 from dateutil import parser
 
 import log
 from app.conf import ModuleConf
 from app.downloader.client._base import _IDownloadClient
-from app.utils import PathUtils, RequestUtils, StringUtils, ExceptionUtils
+from app.utils import RequestUtils, StringUtils, ExceptionUtils, Torrent
 from config import Config
 
 third_party_nas_xunlei = [
@@ -237,8 +237,10 @@ class NasXunlei(_IDownloadClient):
         """
         获取需要转移的种子列表
         """
-        torrents = self.get_completed_torrents()
+        torrents, error = self.get_completed_torrents()
         trans_tasks = []
+        if error:
+            return trans_tasks
         for torrent in torrents:
             name = torrent.name
             if not name:
@@ -276,7 +278,6 @@ class NasXunlei(_IDownloadClient):
         remove_torrents = []
         remove_torrents_ids = []
         for torrent in torrents:
-            torrent_seeding_time = 0
             if torrent.status == NasXunlei_Status.PHASE_TYPE_COMPLETE:
                 torrent_seeding_time = date_now - torrent.update_time
             else:
@@ -357,7 +358,7 @@ class NasXunlei(_IDownloadClient):
             self._nxc.delete_torrents(ids=ids, delete_file=delete_file)
             return True
         except Exception as err:
-            log.error(f"【{self.client_name}】{self.name} 开始下载出错：{str(err)}")
+            log.error(f"【{self.client_name}】{self.name} 删除种子出错：{str(err)}")
             return False
 
     def get_download_dirs(self):
@@ -446,7 +447,7 @@ class NasXunleiProvider:
         resp = self._get(
             url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/tasks",
             params={
-                "filters": json.dumps(filters)
+                "filters": json.dumps(filters),
             }
         )
         all_tasks = []
@@ -462,7 +463,7 @@ class NasXunleiProvider:
             task_info.update_time = parser.parse(task.get("updated_time")).timestamp()
             task_info.name = task.get("name")
             task_info.file_size = task.get("file_size")
-            task_info.speed = int(task.get("speed"))
+            task_info.speed = int(task_param.get("speed"))
             task_info.percent_done = int(task.get("progress")) / 100
             match task.get("phase"):
                 case "PHASE_TYPE_RUNNING":
@@ -529,37 +530,52 @@ class NasXunleiProvider:
         return self._get_torrents(filters=filter)
 
     def add_torrent(self, content, download_dir):
+        if not isinstance(content, str):
+            return self.add_torrent(Torrent.binary_data_to_magnet_link(content), download_dir)
+
         target = self.info_watch().target
-        torrent_info = self._post(
-            url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/resource/list",
-            json_body={
-                "urls": content,
-            }
-        )
-        path_id = self._get_path_id(target, download_dir)
-        error = None
-        for torrent_item in torrent_info.get("list").get("resource"):
-            self._post(
+        try:
+            torrent_info = self._post(
                 url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/resource/list",
                 json_body={
-                    "type": "user#download-url",
-                    "target": target,
-                    "name": torrent_item.get("name"),
-                    "file_name": torrent_item.get("file_name"),
-                    "file_size": torrent_item.get("file_size") if torrent_item.get("file_size") is not None else 0,
-                    "url": torrent_item.get("meta").get("url"),
-                    "file_id": "",
-                    "parent_folder_id": path_id,
+                    "urls": content,
                 }
             )
+        except Exception as err:
+            raise Exception("迅雷获取种子文件列表失败", err)
+        path_id = self._get_path_id(target, download_dir)
+        error = None
+        for torrent_item in torrent_info.get("list").get("resources"):
+            try:
+                task_creation = self._post(
+                    url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/task",
+                    json_body={
+                        "type": "user#download-url",
+                        "name": torrent_item.get("name"),
+                        "file_name": torrent_item.get("file_name"),
+                        "file_size": str(torrent_item.get("file_size") if torrent_item.get("file_size") is not None else 0),
+                        "space": target,
+                        "params": {
+                            "target": target,
+                            "url": torrent_item.get("meta").get("url"),
+                            "total_file_count": str(torrent_item.get("file_count")),
+                            "sub_file_index": self._get_file_index(torrent_item),
+                            "file_id": "",
+                            "parent_folder_id": path_id,
+                        }
+                    }
+                )
+                log.warn(f"task_creation: {task_creation}")
+            except Exception as err:
+                error = Exception("迅雷提交任务失败", err)
         if error is not None:
             raise error
 
-    def _get_path_id(self, space_id, path: str) -> str:
+    def _get_path_id(self, space_id, path: str):
         try:
             parent_id = ""
             dir_list = path.split('/')
-            if '' in dir_list:
+            while '' in dir_list:
                 dir_list.remove('')
             cnt = 0
             while 1:
@@ -573,7 +589,9 @@ class NasXunleiProvider:
                                 "eq": "drive#folder"
                             }
                         }),
-                        "parent_id": parent_id
+                        "space": space_id,
+                        "parent_id": parent_id,
+                        "limit": 200,
                     }
                 )
                 if parent_id == "":
@@ -607,12 +625,18 @@ class NasXunleiProvider:
                     "parent_id": parent_id,
                     "name": dir_name,
                     "space": space_id,
-                    "kind": "drive#folder"
+                    "kind": "drive#folder",
                 }
             )
-            return json.loads(rep.text)['file']['id']
+            return rep['file']['id']
         except Exception as err:
             raise Exception("创建目录失败", err)
+
+    def _get_file_index(self, file_info) -> str:
+        file_count = int(file_info['file_count'])
+        if file_count == 1:
+            return '--1,'
+        return '0-' + str(file_count - 1)
 
     def get_files(self, tid):
         filters = None
@@ -696,9 +720,9 @@ class NasXunleiProvider:
         if delete_file:
             self._set_task_status(ids, "delete")
         else:
-            # /webman/3rdparty/pan-xunlei-com/index.cgi/method/delete/drive/v1/tasks
-            url = "/webman/3rdparty/pan-xunlei-com/index.cgi/method/delete/drive/v1/tasks"
-            if ids is str:
+            target = self.info_watch().target
+            url = f"/webman/3rdparty/pan-xunlei-com/index.cgi/method/delete/drive/v1/tasks?space={target}"
+            if isinstance(ids, str):
                 ids = [ids]
             for id in ids:
                 url = f"{url}&task_ids={id}"
@@ -708,18 +732,21 @@ class NasXunleiProvider:
         token = self.__xunlei_get_token.GetXunLeiToken(self.check_server_now())
         return token
 
-    def _post(self, url, json_body=None):
+    def _post(self, url: str, json_body=None):
+        url = f"{self.host}{url}{'?' if '?' not in url else '&'}pan_auth={self._create_xunlei_token()}&device_space="
+        url = url.replace("#", "%23")
         resp = RequestUtils(headers=self.basic_auth).post(
-            url=f"{self.host}{url}?pan_auth={self._create_xunlei_token()}",
+            url=url,
             json=json_body
         )
         return self._as_checked_json(resp)
 
     def _get(self, url, params=None, with_auth=True):
+        if params is None:
+            params = {}
         if with_auth:
-            if params is None:
-                params = {}
             params["pan_auth"] = self._create_xunlei_token()
+        params["device_space"] = ""
         resp = RequestUtils(headers=self.basic_auth).get(
             url=f"{self.host}{url}",
             params=params
@@ -727,9 +754,13 @@ class NasXunleiProvider:
         return self._as_checked_json(resp)
 
     def _as_checked_json(self, result):
-        result = json.loads(str(result))
-        if result.get("code") is not None and int(result.get("code")) != 0:
-            raise Exception(f"请求失败：{result.get('error')}")
+        if result is not None:
+            if isinstance(result, requests.models.Response):
+                result = result.json()
+            else:
+                result = json.loads(str(result))
+            if result.get("code") is not None and int(result.get("code")) != 0:
+                raise Exception(f"请求失败：{result.get('error')}")
         return result
 
     def __init__(self, host, port, username, password):
