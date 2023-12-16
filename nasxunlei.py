@@ -12,7 +12,7 @@ from dateutil import parser
 import log
 from app.conf import ModuleConf
 from app.downloader.client._base import _IDownloadClient
-from app.utils import PathUtils, RequestUtils, StringUtils
+from app.utils import PathUtils, RequestUtils, StringUtils, ExceptionUtils
 from config import Config
 
 third_party_nas_xunlei = [
@@ -426,7 +426,7 @@ class NasXunleiProvider:
     __xunlei_get_token = None
 
     def check_server_now(self):
-        resp = self._get(url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/device/now", with_auth=False)
+        resp = self._get(url="/webman/3rdparty/pan-xunlei-com/index.cgi/device/now", with_auth=False)
         return int(resp.get('now'))
 
     def info_watch(self):
@@ -728,7 +728,7 @@ class NasXunleiProvider:
 
     def _as_checked_json(self, result):
         result = json.loads(str(result))
-        if "code" in result.get("code") and int(result.get("code")) != 0:
+        if result.get("code") is not None and int(result.get("code")) != 0:
             raise Exception(f"请求失败：{result.get('error')}")
         return result
 
