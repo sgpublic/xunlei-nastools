@@ -551,7 +551,7 @@ class NasXunleiProvider:
         error = None
         for torrent_item in torrent_info.get("list").get("resources"):
             try:
-                task_creation = self._post(
+                self._post(
                     url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/task",
                     json_body={
                         "type": "user#download-url",
@@ -569,7 +569,6 @@ class NasXunleiProvider:
                         }
                     }
                 )
-                log.warn(f"task_creation: {task_creation}")
             except Exception as err:
                 error = Exception("迅雷提交任务失败", err)
         if error is not None:
