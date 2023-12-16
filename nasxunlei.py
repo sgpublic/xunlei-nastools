@@ -12,7 +12,7 @@ from dateutil import parser
 import log
 from app.conf import ModuleConf
 from app.downloader.client._base import _IDownloadClient
-from app.utils import RequestUtils, StringUtils, Torrent
+from app.utils import RequestUtils, StringUtils, Torrent, ExceptionUtils
 from config import Config
 
 third_party_nas_xunlei = [
@@ -143,11 +143,9 @@ class NasXunlei(_IDownloadClient):
     def match(cls, ctype):
         return True if ctype in [cls.client_id, cls.client_type, cls.client_name] else False
 
-    # @abstractmethod
     def get_type(self):
         return self.client_type
 
-    # @abstractmethod
     def connect(self):
         if self.host and self.port:
             self._nxc = self.__login_nas_xunlei()
@@ -168,7 +166,7 @@ class NasXunlei(_IDownloadClient):
         if not self._nxc:
             return False
         try:
-            self._nxc.check_server_now()
+            self._nxc.info_watch()
             return True
         except Exception as e:
             log.error(f"【{self.client_name}】{self.name} 获取状态出错：{str(e)}")
@@ -323,6 +321,7 @@ class NasXunlei(_IDownloadClient):
             return True
         except Exception as err:
             log.error(f"【{self.client_name}】{self.name} 添加种子出错：{str(err)}")
+            ExceptionUtils.exception_traceback(err)
             return False
 
     def start_torrents(self, ids):
@@ -423,7 +422,10 @@ class NasXunlei(_IDownloadClient):
 
 class NasXunleiProvider:
     host = None
-    basic_auth = None
+    common_header = {
+        "Content-Type": "application/json; charset=UTF-8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
+    }
     __xunlei_get_token = None
 
     def check_server_now(self):
@@ -596,6 +598,7 @@ class NasXunleiProvider:
                         "limit": 200,
                     }
                 )
+                print(f"dirs: {dirs}")
                 if parent_id == "":
                     parent_id = dirs['files'][0]['id']
                     continue
@@ -735,11 +738,14 @@ class NasXunleiProvider:
         return token
 
     def _post(self, url: str, json_body=None):
-        url = f"{self.host}{url}{'?' if '?' not in url else '&'}pan_auth={self._create_xunlei_token()}&device_space="
+        xtoken = self._create_xunlei_token()
+        headers = dict(**self.common_header)
+        headers["pan-auth"] = xtoken
+        url = f"{self.host}{url}{'?' if '?' not in url else '&'}pan_auth={xtoken}&device_space="
         url = url.replace("#", "%23")
-        resp = RequestUtils(headers=self.basic_auth).post(
+        resp = RequestUtils(headers=headers).post(
             url=url,
-            json=json_body
+            json=json_body,
         )
         return self._as_checked_json(resp)
 
@@ -747,9 +753,12 @@ class NasXunleiProvider:
         if params is None:
             params = {}
         if with_auth:
-            params["pan_auth"] = self._create_xunlei_token()
+            xtoken = self._create_xunlei_token()
+            params["pan_auth"] = xtoken
+            headers = dict(**self.common_header)
+            headers["pan-auth"] = xtoken
         params["device_space"] = ""
-        resp = RequestUtils(headers=self.basic_auth).get(
+        resp = RequestUtils(headers=self.common_header).get(
             url=f"{self.host}{url}",
             params=params
         )
@@ -757,12 +766,22 @@ class NasXunleiProvider:
 
     def _as_checked_json(self, result):
         if result is not None:
-            if isinstance(result, requests.models.Response):
-                result = result.json()
-            else:
-                result = json.loads(str(result))
-            if result.get("code") is not None and int(result.get("code")) != 0:
-                raise Exception(f"请求失败：{result.get('error')}")
+            try:
+                if isinstance(result, requests.models.Response):
+                    result = result.json()
+                else:
+                    result = json.loads(str(result))
+            except Exception as err:
+                if isinstance(result, requests.models.Response):
+                    log.debug(f"【NAS 迅雷】响应解析失败：{result.text}")
+                else:
+                    log.debug(f"【NAS 迅雷】响应解析失败：{result}")
+                raise Exception("响应 json 解析失败，请检查控制台输出日志。", err)
+            if result.get("error_code") is not None and int(result.get("error_code")) != 0:
+                if "permission_deny" in result.get('error'):
+                    raise Exception("签名算法失效，请根据 README.md 中提示进行操作后再试。")
+                else:
+                    raise Exception(f"请求失败：{result.get('error')}")
         return result
 
     def __init__(self, host, port, username, password):
@@ -772,9 +791,7 @@ class NasXunleiProvider:
         if str(port).isdigit():
             self.host = f"{self.host}:{port}"
         if username is not None and password is not None:
-            self.basic_auth = {
-                "Authorization": base64.b64encode(f"{username}:{password}".encode('utf-8'))
-            }
+            self.common_header["Authorization"] = base64.b64encode(f"{username}:{password}".encode('utf-8'))
         # https://github.com/opennaslab/kubespider/blob/f55eab6a931d1851d5cbe2b6467d7dde96bffdef/.config/dependencies/xunlei_download_provider/get_token.js
         xunlei_get_token = os.path.join(Config().get_config_path(), "xunlei_get_token.js")
         __xunlei_get_token_js_external = """

@@ -14,10 +14,11 @@
 
 ### 食用方法
 
-1. 将本项目 `third_party` 目录映射到 nas-tools 容器的 `/nas-tools/third_party_nas_xunlei`。
-2. 将本项目 `nasxunlei.py` 文件映射到 nas-tools 容器的 `/nas-tools/app/downloader/client/nasxunlei.py`。
-3. 重启 nas-tools，enjoy！
+1. 使用 `git clone https://github.com/sgpublic/xunlei-nastools --recursive` 克隆本项目。
+2. 将本项目 `third_party` 目录映射到 nas-tools 容器的 `/nas-tools/third_party_nas_xunlei`。
+3. 将本项目 `nasxunlei.py` 文件映射到 nas-tools 容器的 `/nas-tools/app/downloader/client/nasxunlei.py`。
+4. 重启 nas-tools，enjoy！
 
 ### 未来适配
 
-若 NAS 迅雷更新后签名失效，您可根据 [迅雷下载提供器安装和配置](https://github.com/opennaslab/kubespider/tree/f55eab6a931d1851d5cbe2b6467d7dde96bffdef/docs/zh/user_guide/thunder_install_config) 创建 `get_token.js` 文件，改名为 `xunlei_get_token.js` 并放入 nas-tools 配置文件夹中（与 `config.yaml` 同一目录）即可。
+若提示签名失效，您可根据 [迅雷下载提供器安装和配置](https://github.com/opennaslab/kubespider/tree/f55eab6a931d1851d5cbe2b6467d7dde96bffdef/docs/zh/user_guide/thunder_install_config) 创建 `get_token.js` 文件，改名为 `xunlei_get_token.js` 并放入 nas-tools 配置文件夹中（与 `config.yaml` 同一目录），然后重启 nas-tools 即可。
