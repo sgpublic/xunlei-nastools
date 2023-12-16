@@ -1,14 +1,18 @@
 import base64
+import datetime
 import json
 import os.path
+import re
 import sys
 from enum import Enum
 from types import SimpleNamespace
 
+from dateutil import parser
+
 import log
 from app.conf import ModuleConf
 from app.downloader.client._base import _IDownloadClient
-from app.utils import PathUtils, RequestUtils
+from app.utils import PathUtils, RequestUtils, StringUtils
 from config import Config
 
 third_party_nas_xunlei = [
@@ -17,20 +21,21 @@ third_party_nas_xunlei = [
 ]
 for dep in third_party_nas_xunlei:
     sys.path.append(os.path.join(Config().get_root_path(), "third_party_nas_xunlei", dep).replace("\\", "/"))
-
 import js2py
+
 
 class Downloader_NasXunlei(Enum):
     NAS_XUNLEI = "NAS 迅雷"
 
+
 class NasXunlei_Status(str, Enum):
     """enum for torrent status"""
 
-    PAUSED = "PHASE_TYPE_PAUSED"
-    DOWNLOAD_PENDING = "PHASE_TYPE_PENDING"
-    DOWNLOADING = "PHASE_TYPE_RUNNING"
-    COMPLETE = "PHASE_TYPE_COMPLETE"
-    ERROR = "PHASE_TYPE_ERROR"
+    PHASE_TYPE_PAUSED = "PHASE_TYPE_PAUSED"
+    PHASE_TYPE_PENDING = "PHASE_TYPE_PENDING"
+    PHASE_TYPE_RUNNING = "PHASE_TYPE_RUNNING"
+    PHASE_TYPE_COMPLETE = "PHASE_TYPE_COMPLETE"
+    PHASE_TYPE_ERROR = "PHASE_TYPE_ERROR"
 
     @property
     def stopped(self) -> bool:
@@ -91,6 +96,18 @@ ModuleConf.DOWNLOADER_CONF["nas_xunlei"] = {
             "type": "password",
             "placeholder": "password"
         }
+    }
+}
+ModuleConf.TORRENTREMOVER_DICT["nas_xunlei"] = {
+    "name": "NAS 迅雷",
+    "img_url": _nas_xunlei_icon,
+    "downloader_type": Downloader_NasXunlei.NAS_XUNLEI,
+    "torrent_state": {
+        "PHASE_TYPE_PAUSED": "暂停",
+        "PHASE_TYPE_RUNNING": "正在下载",
+        "PHASE_TYPE_PENDING": "等待下载_排队",
+        "PHASE_TYPE_COMPLETE": "下载完成",
+        "PHASE_TYPE_ERROR": "错误",
     }
 }
 
@@ -177,7 +194,7 @@ class NasXunlei(_IDownloadClient):
             log.error(f"【{self.client_name}】{self.name} 获取种子列表出错：{str(err)}")
             return [], True
 
-    def get_downloading_torrents(self, ids, tag):
+    def get_downloading_torrents(self, ids=None, tag=None):
         if not self._nxc:
             return [], True
         try:
@@ -190,7 +207,7 @@ class NasXunlei(_IDownloadClient):
             log.error(f"【{self.client_name}】{self.name} 获取正在下载种子列表出错：{str(err)}")
             return [], True
 
-    def get_completed_torrents(self, ids, tag):
+    def get_completed_torrents(self, ids=None, tag=None):
         if not self._nxc:
             return [], True
         try:
@@ -203,20 +220,38 @@ class NasXunlei(_IDownloadClient):
             log.error(f"【{self.client_name}】{self.name} 获取已完成种子列表出错：{str(err)}")
             return [], True
 
-    def get_files(self, tid):
+    def get_files(self, tid=None):
         """
         读取种子文件列表
         """
-        pass
+        try:
+            return self._nxc.get_files(tid)
+        except Exception as err:
+            log.error(f"【{self.client_name}】{self.name} 获取种子文件列表出错：{str(err)}")
+            return None
 
     def set_torrents_status(self, ids, tags=None):
-        return False
+        return self.delete_torrents(ids=ids, delete_file=False)
 
     def get_transfer_task(self, tag, match_path=None):
         """
         获取需要转移的种子列表
         """
-        pass
+        torrents = self.get_completed_torrents()
+        trans_tasks = []
+        for torrent in torrents:
+            name = torrent.name
+            if not name:
+                continue
+            path = torrent.real_path
+            if not path:
+                continue
+            true_path, replace_flag = self.get_replace_path(path, self.download_dir)
+            if match_path and not replace_flag:
+                log.debug(f"【{self.client_name}】{self.name} 开启目录隔离，但 {torrent.name} 未匹配下载目录范围")
+                continue
+            trans_tasks.append({'path': os.path.join(true_path, name).replace("\\", "/"), 'id': torrent.id})
+        return trans_tasks
 
     def get_remove_torrents(self, config):
         """
@@ -224,62 +259,118 @@ class NasXunlei(_IDownloadClient):
         :param config: 删种策略
         :return: 种子ID列表
         """
-        pass
+        # 做种时间 单位：小时
+        seeding_time = config.get("seeding_time")
+        # 大小 单位：GB
+        size = config.get("size")
+        minsize = size[0] * 1024 * 1024 * 1024 if size else 0
+        maxsize = size[-1] * 1024 * 1024 * 1024 if size else 0
+        # 保存路径
+        savepath_key = config.get("savepath_key")
+
+        # 按下载状态筛选要改 nastools 源码才行，这里仅作冗余支持处理
+        torrents, error = self.get_torrents(status=config.get("xl_state"))
+        if error:
+            return []
+        date_now = self._nxc.check_server_now()
+        remove_torrents = []
+        remove_torrents_ids = []
+        for torrent in torrents:
+            torrent_seeding_time = 0
+            if torrent.status == NasXunlei_Status.PHASE_TYPE_COMPLETE:
+                torrent_seeding_time = date_now - torrent.update_time
+            else:
+                torrent_seeding_time = date_now - torrent.create_time
+            if seeding_time and torrent_seeding_time < seeding_time:
+                continue
+            if size and (torrent.size >= maxsize or torrent.total_size <= minsize):
+                continue
+            if savepath_key and not re.findall(savepath_key, torrent.real_path, re.I):
+                continue
+            remove_torrents.append({
+                "id": torrent.id,
+                "name": torrent.name,
+                "site": "",
+                "size": torrent.size
+            })
+            remove_torrents_ids.append(torrent.id)
+        if config.get("samedata") and remove_torrents:
+            remove_torrents_plus = []
+            for remove_torrent in remove_torrents:
+                name = remove_torrent.get("name")
+                size = remove_torrent.get("size")
+                for torrent in torrents:
+                    if torrent.name == name and torrent.size == size and torrent.id not in remove_torrents_ids:
+                        remove_torrents_plus.append({
+                            "id": torrent.id,
+                            "name": torrent.name,
+                            "site": "",
+                            "size": torrent.size
+                        })
+            remove_torrents_plus += remove_torrents
+            return remove_torrents_plus
+        return remove_torrents
 
     def add_torrent(self, content, download_dir=None, **kwargs):
         """
         添加下载任务
         """
-        pass
+        if not self._nxc:
+            return False
+        try:
+            self._nxc.add_torrent(content=content, download_dir=download_dir)
+            return True
+        except Exception as err:
+            log.error(f"【{self.client_name}】{self.name} 添加种子出错：{str(err)}")
+            return False
 
     def start_torrents(self, ids):
         """
         下载控制：开始
         """
-        pass
+        if not self or not ids:
+            return False
+        try:
+            self._nxc.start_torrents(ids=ids)
+            return True
+        except Exception as err:
+            log.error(f"【{self.client_name}】{self.name} 开始下载出错：{str(err)}")
+            return False
 
     def stop_torrents(self, ids):
         """
         下载控制：停止
         """
-        pass
-
-    def delete_torrents(self, delete_file, ids):
-        if not self._nxc:
+        if not self or not ids:
             return False
         try:
-            self._nxc.delete_torrents
+            self._nxc.stop_torrents(ids=ids)
+            return True
+        except Exception as err:
+            log.error(f"【{self.client_name}】{self.name} 停止下载出错：{str(err)}")
+            return False
+
+    def delete_torrents(self, delete_file, ids):
+        if not self or not ids:
+            return False
+        try:
+            self._nxc.delete_torrents(ids=ids, delete_file=delete_file)
+            return True
+        except Exception as err:
+            log.error(f"【{self.client_name}】{self.name} 开始下载出错：{str(err)}")
+            return False
 
     def get_download_dirs(self):
         """
         获取下载目录清单
         """
-        pass
-
-    def get_replace_path(path, downloaddir) -> (str, bool):
-        """
-        对目录路径进行转换
-        :param path: 需要转换的路径
-        :param downloaddir: 下载目录清单
-        :return: 转换后的路径, 是否进行转换
-        """
-        if not path or not downloaddir:
-            return "", False
-        path = os.path.normpath(path)
-        for attr in downloaddir:
-            save_path = attr.get("save_path")
-            if not save_path:
-                continue
-            save_path = os.path.normpath(save_path)
-            container_path = attr.get("container_path")
-            # 没有访问目录，视为与下载保存目录相同
-            if not container_path:
-                container_path = save_path
-            else:
-                container_path = os.path.normpath(container_path)
-            if PathUtils.is_path_in_path(save_path, path):
-                return path.replace(save_path, container_path), True
-        return path, False
+        if not self._nxc:
+            return []
+        try:
+            return self._nxc.get_download_dirs()
+        except Exception as err:
+            log.error(f"【{self.client_name}】{self.name} 获取下载目录清单出错：{str(err)}")
+            return []
 
     def change_torrent(self, **kwargs):
         """
@@ -287,17 +378,40 @@ class NasXunlei(_IDownloadClient):
         """
         pass
 
-    def get_downloading_progress(self):
+    def get_downloading_progress(self, ids=None, **kwargs):
         """
         获取下载进度
         """
-        pass
+        torrents = self.get_downloading_torrents(ids=ids)
+        DispTorrents = []
+        for torrent in torrents:
+            if torrent.status == NasXunlei_Status.PHASE_TYPE_RUNNING:
+                state = "Downloading"
+                speed = "%s%sB/s" % (chr(8595), StringUtils.str_filesize(torrent.speed))
+            else:
+                state = "Stoped"
+                speed = "已暂停"
+            DispTorrents.append({
+                'id': torrent.id,
+                'name': torrent.name,
+                'speed': speed,
+                'state': state,
+                'progress': torrent.progress
+            })
+        return DispTorrents
 
-    def set_speed_limit(self, **kwargs):
+    def set_speed_limit(self, download_limit=None, upload_limit=None):
         """
         设置速度限制
         """
-        pass
+        if not self._nxc:
+            return False
+        try:
+            self._nxc.set_speed_limit(download_limit)
+            return True
+        except Exception as err:
+            log.error(f"【{self.client_name}】{self.name} 设置速度限制出错：{str(err)}")
+            return False
 
     def recheck_torrents(self, ids):
         """
@@ -312,52 +426,55 @@ class NasXunleiProvider:
     __xunlei_get_token = None
 
     def check_server_now(self):
-        resp = RequestUtils().get(url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/device/now")
-        return int(json.loads(str(resp)).get('now'))
+        resp = self._get(url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/device/now", with_auth=False)
+        return int(resp.get('now'))
 
     def info_watch(self):
-        try:
-            resp = RequestUtils(headers=self.basic_auth).get(
-                url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/device/info/watch",
-                params={
-                    "pan_auth": self._create_xunlei_token()
-                }
-            )
-            return json.loads(str(resp)).get("client_version")
-        except Exception as e:
-            return None
+        resp = self._post(
+            url="/webman/3rdparty/pan-xunlei-com/index.cgi/device/info/watch",
+            json_body={}
+        )
+        watch_info = SimpleNamespace()
+        watch_info.target = resp.get("target")
+        watch_info.client_version = resp.get("client_version")
+        return watch_info
 
     def _get_torrents(self, filters):
         filters["type"] = {
             "in": "user#download-url,user#download"
         }
-        resp = RequestUtils(headers=self.basic_auth).get(
-            url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/tasks",
+        resp = self._get(
+            url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/tasks",
             params={
-                "pan_auth": self._create_xunlei_token(),
                 "filters": json.dumps(filters)
             }
         )
         all_tasks = []
-        for task in json.loads(str(resp)).get("tasks"):
+        for task in resp.get("tasks"):
             task_param = task.get("params")
 
             task_info = SimpleNamespace()
-            task_info.type = task.get("type")
             task_info.space = task.get("space")
             task_info.id = task.get("id")
+            task_info.type = task.get("type")
+            task_info.file_id = task.get("file_id")
+            task_info.create_time = parser.parse(task.get("created_time")).timestamp()
+            task_info.update_time = parser.parse(task.get("updated_time")).timestamp()
+            task_info.name = task.get("name")
+            task_info.file_size = task.get("file_size")
+            task_info.speed = int(task.get("speed"))
             task_info.percent_done = int(task.get("progress")) / 100
             match task.get("phase"):
                 case "PHASE_TYPE_RUNNING":
-                    task_info.status = NasXunlei_Status.DOWNLOADING
+                    task_info.status = NasXunlei_Status.PHASE_TYPE_RUNNING
                 case "PHASE_TYPE_PAUSED":
-                    task_info.status = NasXunlei_Status.PAUSED
+                    task_info.status = NasXunlei_Status.PHASE_TYPE_PAUSED
                 case "PHASE_TYPE_PENDING":
-                    task_info.status = NasXunlei_Status.DOWNLOAD_PENDING
+                    task_info.status = NasXunlei_Status.PHASE_TYPE_PENDING
                 case "PHASE_TYPE_ERROR":
-                    task_info.status = NasXunlei_Status.ERROR
+                    task_info.status = NasXunlei_Status.PHASE_TYPE_ERROR
                 case "PHASE_TYPE_COMPLETE":
-                    task_info.status = NasXunlei_Status.COMPLETE
+                    task_info.status = NasXunlei_Status.PHASE_TYPE_COMPLETE
             task_info.hashString = task_param.get("info_hash")
             task_info.download_dir = task_param.get("real_path")
 
@@ -365,7 +482,7 @@ class NasXunleiProvider:
 
         return all_tasks
 
-    def get_torrents(self, ids, status):
+    def get_torrents(self, ids=None, status=None):
         filter = {}
         if ids is list:
             filter["id"] = {
@@ -411,17 +528,209 @@ class NasXunleiProvider:
         }
         return self._get_torrents(filters=filter)
 
-    def add_torrent(self, content, download_dir=None):
-        resp = RequestUtils(headers=self.basic_auth).post(
-            url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/resource/list?pan_auth={self._create_xunlei_token()}",
-            json={
+    def add_torrent(self, content, download_dir):
+        target = self.info_watch().target
+        torrent_info = self._post(
+            url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/resource/list",
+            json_body={
                 "urls": content,
             }
         )
+        path_id = self._get_path_id(target, download_dir)
+        error = None
+        for torrent_item in torrent_info.get("list").get("resource"):
+            self._post(
+                url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/resource/list",
+                json_body={
+                    "type": "user#download-url",
+                    "target": target,
+                    "name": torrent_item.get("name"),
+                    "file_name": torrent_item.get("file_name"),
+                    "file_size": torrent_item.get("file_size") if torrent_item.get("file_size") is not None else 0,
+                    "url": torrent_item.get("meta").get("url"),
+                    "file_id": "",
+                    "parent_folder_id": path_id,
+                }
+            )
+        if error is not None:
+            raise error
+
+    def _get_path_id(self, space_id, path: str) -> str:
+        try:
+            parent_id = ""
+            dir_list = path.split('/')
+            if '' in dir_list:
+                dir_list.remove('')
+            cnt = 0
+            while 1:
+                if len(dir_list) == cnt:
+                    return parent_id
+                dirs = self._get(
+                    url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/files",
+                    params={
+                        "filters": json.dumps({
+                            "kind": {
+                                "eq": "drive#folder"
+                            }
+                        }),
+                        "parent_id": parent_id
+                    }
+                )
+                if parent_id == "":
+                    parent_id = dirs['files'][0]['id']
+                    continue
+
+                exists = False
+                if 'files' in dirs.keys():
+                    for dir_now in dirs['files']:
+                        if dir_now['name'] == dir_list[cnt]:
+                            cnt += 1
+                            exists = True
+                            parent_id = dir_now['id']
+                            break
+
+                if exists:
+                    continue
+
+                parent_id = self._create_sub_path(space_id, dir_list[cnt], parent_id)
+                if parent_id is None:
+                    return None
+                cnt += 1
+        except Exception as err:
+            raise Exception("获取目录 ID 失败", err)
+
+    def _create_sub_path(self, space_id, dir_name: str, parent_id: str) -> TypeError:
+        try:
+            rep = self._post(
+                url='/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/files',
+                json_body={
+                    "parent_id": parent_id,
+                    "name": dir_name,
+                    "space": space_id,
+                    "kind": "drive#folder"
+                }
+            )
+            return json.loads(rep.text)['file']['id']
+        except Exception as err:
+            raise Exception("创建目录失败", err)
+
+    def get_files(self, tid):
+        filters = None
+        if tid is not None:
+            filters = {
+                "id": {
+                    "in": tid
+                }
+            }
+        task = self._get_torrents(filters=filters)
+        if len(task) >= 1:
+            task = task[0]
+        else:
+            raise Exception(f"No task id of {tid}")
+        resp = self._get(
+            url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/files",
+            params={
+                "pan_auth": self._create_xunlei_token(),
+                "parent_id": task.file_id
+            }
+        )
+        files = resp.get("files")
+        result = []
+        for file in files:
+            info = SimpleNamespace()
+            info.id = file.get("id")
+            info.name = file.get("name")
+            info.size = int(file.get("size"))
+            result.append(info)
+        return result
+
+    def get_download_dirs(self):
+        resp = self._get(
+            url="/webman/3rdparty/pan-xunlei-com/index.cgi/device/download_paths"
+        )
+        dirs = []
+        for dir in resp:
+            dirs.append(dir.get("RealPath"))
+        return dirs
+
+    def set_speed_limit(self, speed):
+        self._post(
+            url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/resource/list",
+            json_body={
+                "speed_limit": speed,
+            }
+        )
+
+    def _set_task_status(self, ids, status):
+        if ids is str:
+            ids = [ids]
+        torrents = self.get_torrents(ids=ids)
+        has_failed_id = None
+        for torrent in torrents:
+            try:
+                self._post(
+                    url="/webman/3rdparty/pan-xunlei-com/index.cgi/method/patch/drive/v1/task",
+                    json_body={
+                        "id": torrent.id,
+                        "space": torrent.space,
+                        "type": torrent.type,
+                        "set_params": {
+                            "spec": json.dumps({
+                                "phase": status
+                            })
+                        }
+                    }
+                )
+            except Exception as err:
+                has_failed_id = err
+        if has_failed_id is not None:
+            raise has_failed_id
+
+    def start_torrents(self, ids):
+        self._set_task_status(ids=ids, status="running")
+
+    def stop_torrents(self, ids):
+        self._set_task_status(ids=ids, status="pause")
+
+    def delete_torrents(self, ids, delete_file):
+        if delete_file:
+            self._set_task_status(ids, "delete")
+        else:
+            # /webman/3rdparty/pan-xunlei-com/index.cgi/method/delete/drive/v1/tasks
+            url = "/webman/3rdparty/pan-xunlei-com/index.cgi/method/delete/drive/v1/tasks"
+            if ids is str:
+                ids = [ids]
+            for id in ids:
+                url = f"{url}&task_ids={id}"
+            self._post(url=url, json_body={})
 
     def _create_xunlei_token(self):
         token = self.__xunlei_get_token.GetXunLeiToken(self.check_server_now())
         return token
+
+    def _post(self, url, json_body=None):
+        resp = RequestUtils(headers=self.basic_auth).post(
+            url=f"{self.host}{url}?pan_auth={self._create_xunlei_token()}",
+            json=json_body
+        )
+        return self._as_checked_json(resp)
+
+    def _get(self, url, params=None, with_auth=True):
+        if with_auth:
+            if params is None:
+                params = {}
+            params["pan_auth"] = self._create_xunlei_token()
+        resp = RequestUtils(headers=self.basic_auth).get(
+            url=f"{self.host}{url}",
+            params=params
+        )
+        return self._as_checked_json(resp)
+
+    def _as_checked_json(self, result):
+        result = json.loads(str(result))
+        if "code" in result.get("code") and int(result.get("code")) != 0:
+            raise Exception(f"请求失败：{result.get('error')}")
+        return result
 
     def __init__(self, host, port, username, password):
         self.host = host
@@ -635,9 +944,10 @@ function GetTokenInternal(a, i) {
     return iB.exports(a, i)
 }
 // 这部分代码不要动 -- end
-        """ + f"""
-        {__xunlei_get_token_js_external}
-        """
+
+""" + f"""
+{__xunlei_get_token_js_external}
+"""
         context = js2py.EvalJs()
         context.execute(__xunlei_get_token_js)
         self.__xunlei_get_token = context
