@@ -190,6 +190,7 @@ class NasXunlei(_IDownloadClient):
                 return all_tasks, False
         except Exception as err:
             log.error(f"【{self.client_name}】{self.name} 获取种子列表出错：{str(err)}")
+            ExceptionUtils.exception_traceback(err)
             return [], True
 
     def get_downloading_torrents(self, ids=None, tag=None):
@@ -243,7 +244,7 @@ class NasXunlei(_IDownloadClient):
             name = torrent.name
             if not name:
                 continue
-            path = torrent.real_path
+            path = torrent.download_dir
             if not path:
                 continue
             true_path, replace_flag = self.get_replace_path(path, self.download_dir)
@@ -282,15 +283,15 @@ class NasXunlei(_IDownloadClient):
                 torrent_seeding_time = date_now - torrent.create_time
             if seeding_time and torrent_seeding_time < seeding_time:
                 continue
-            if size and (torrent.size >= maxsize or torrent.total_size <= minsize):
+            if size and (torrent.file_size >= maxsize or torrent.file_size <= minsize):
                 continue
-            if savepath_key and not re.findall(savepath_key, torrent.real_path, re.I):
+            if savepath_key and not re.findall(savepath_key, torrent.download_dir, re.I):
                 continue
             remove_torrents.append({
                 "id": torrent.id,
                 "name": torrent.name,
                 "site": "",
-                "size": torrent.size
+                "size": torrent.file_size
             })
             remove_torrents_ids.append(torrent.id)
         if config.get("samedata") and remove_torrents:
@@ -299,12 +300,12 @@ class NasXunlei(_IDownloadClient):
                 name = remove_torrent.get("name")
                 size = remove_torrent.get("size")
                 for torrent in torrents:
-                    if torrent.name == name and torrent.size == size and torrent.id not in remove_torrents_ids:
+                    if torrent.name == name and torrent.file_size == size and torrent.id not in remove_torrents_ids:
                         remove_torrents_plus.append({
                             "id": torrent.id,
                             "name": torrent.name,
                             "site": "",
-                            "size": torrent.size
+                            "size": torrent.file_size
                         })
             remove_torrents_plus += remove_torrents
             return remove_torrents_plus
