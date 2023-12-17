@@ -465,7 +465,7 @@ class NasXunleiProvider:
             task_info.create_time = parser.parse(task.get("created_time")).timestamp()
             task_info.update_time = parser.parse(task.get("updated_time")).timestamp()
             task_info.name = task.get("name")
-            task_info.file_size = task.get("file_size")
+            task_info.file_size = int(task.get("file_size"))
             task_info.speed = int(task_param.get("speed"))
             task_info.percent_done = int(task.get("progress")) / 100
             match task.get("phase"):
