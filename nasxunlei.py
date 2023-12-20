@@ -185,7 +185,7 @@ class NasXunlei(_IDownloadClient):
         try:
             all_tasks = self._nxc.get_torrents(ids=ids, status=status)
             if not all_tasks:
-                return None, True
+                return [], False
             else:
                 return all_tasks, False
         except Exception as err:
@@ -451,9 +451,12 @@ class NasXunleiProvider:
             url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/tasks",
             params={
                 "filters": json.dumps(filters),
+                "space": self.info_watch().target,
             }
         )
         all_tasks = []
+        if resp.get("tasks") is None:
+            return all_tasks
         for task in resp.get("tasks"):
             task_param = task.get("params")
 
@@ -487,7 +490,11 @@ class NasXunleiProvider:
         return all_tasks
 
     def get_torrents(self, ids=None, status=None):
-        filter = {}
+        filter = {
+            "type": {
+                "in": "user#download-url,user#download"
+            }
+        }
         if ids is list:
             filter["id"] = {
                 "in": ids.join(",")
