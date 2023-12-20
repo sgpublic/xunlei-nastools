@@ -281,7 +281,7 @@ class NasXunlei(_IDownloadClient):
                 torrent_seeding_time = date_now - torrent.update_time
             else:
                 torrent_seeding_time = date_now - torrent.create_time
-            if seeding_time and torrent_seeding_time < seeding_time:
+            if seeding_time and torrent_seeding_time < seeding_time * 3600:
                 continue
             if size and (torrent.file_size >= maxsize or torrent.file_size <= minsize):
                 continue
