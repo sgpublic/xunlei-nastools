@@ -429,12 +429,35 @@ class NasXunleiProvider:
     }
     __xunlei_get_token = None
 
-    def check_server_now(self):
-        resp = self._get(url="/webman/3rdparty/pan-xunlei-com/index.cgi/device/now", with_auth=False)
+    def check_server_version(self) -> str:
+        try:
+            resp = self._get_as_json(url="/webman/3rdparty/pan-xunlei-com/index.cgi/launcher/status", with_auth=False)
+            return str(resp.get('running_version'))
+        except Exception as e:
+            raise Exception("迅雷获取服务器版本失败", e)
+
+    def _check_version_at_lest(self, current_version: str, target_version: str) -> bool:
+        if current_version == target_version:
+            return True
+        current_version = self._parse_version(current_version)
+        target_version = self._parse_version(target_version)
+        index = 0
+        while True:
+            if len(current_version) <= index or len(target_version) <= index:
+                return False
+            if current_version[index] > target_version[index]:
+                return True
+            index += 1
+
+    def _parse_version(self, version_name: str) -> list[int]:
+        return [int(x) for x in version_name.split('.')]
+
+    def check_server_now(self) -> int:
+        resp = self._get_as_json(url="/webman/3rdparty/pan-xunlei-com/index.cgi/device/now", with_auth=False)
         return int(resp.get('now'))
 
     def info_watch(self):
-        resp = self._post(
+        resp = self._post_as_json(
             url="/webman/3rdparty/pan-xunlei-com/index.cgi/device/info/watch",
             json_body={}
         )
@@ -447,7 +470,7 @@ class NasXunleiProvider:
         filters["type"] = {
             "in": "user#download-url,user#download"
         }
-        resp = self._get(
+        resp = self._get_as_json(
             url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/tasks",
             params={
                 "filters": json.dumps(filters),
@@ -547,7 +570,7 @@ class NasXunleiProvider:
 
         target = self.info_watch().target
         try:
-            torrent_info = self._post(
+            torrent_info = self._post_as_json(
                 url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/resource/list",
                 json_body={
                     "urls": content,
@@ -559,7 +582,7 @@ class NasXunleiProvider:
         error = None
         for torrent_item in torrent_info.get("list").get("resources"):
             try:
-                self._post(
+                self._post_as_json(
                     url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/task",
                     json_body={
                         "type": "user#download-url",
@@ -592,7 +615,7 @@ class NasXunleiProvider:
             while 1:
                 if len(dir_list) == cnt:
                     return parent_id
-                dirs = self._get(
+                dirs = self._get_as_json(
                     url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/files",
                     params={
                         "filters": json.dumps({
@@ -630,7 +653,7 @@ class NasXunleiProvider:
 
     def _create_sub_path(self, space_id, dir_name: str, parent_id: str) -> TypeError:
         try:
-            rep = self._post(
+            rep = self._post_as_json(
                 url='/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/files',
                 json_body={
                     "parent_id": parent_id,
@@ -662,10 +685,10 @@ class NasXunleiProvider:
             task = task[0]
         else:
             raise Exception(f"No task id of {tid}")
-        resp = self._get(
+        resp = self._get_as_json(
             url=f"{self.host}/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/files",
             params={
-                "pan_auth": self._create_xunlei_token(),
+                "pan_auth": self._get_token(),
                 "parent_id": task.file_id
             }
         )
@@ -680,7 +703,7 @@ class NasXunleiProvider:
         return result
 
     def get_download_dirs(self):
-        resp = self._get(
+        resp = self._get_as_json(
             url="/webman/3rdparty/pan-xunlei-com/index.cgi/device/download_paths"
         )
         dirs = []
@@ -689,7 +712,7 @@ class NasXunleiProvider:
         return dirs
 
     def set_speed_limit(self, speed):
-        self._post(
+        self._post_as_json(
             url="/webman/3rdparty/pan-xunlei-com/index.cgi/drive/v1/resource/list",
             json_body={
                 "speed_limit": speed,
@@ -703,7 +726,7 @@ class NasXunleiProvider:
         has_failed_id = None
         for torrent in torrents:
             try:
-                self._post(
+                self._post_as_json(
                     url="/webman/3rdparty/pan-xunlei-com/index.cgi/method/patch/drive/v1/task",
                     json_body={
                         "id": torrent.id,
@@ -737,14 +760,29 @@ class NasXunleiProvider:
                 ids = [ids]
             for id in ids:
                 url = f"{url}&task_ids={id}"
-            self._post(url=url, json_body={})
+            self._post_as_json(url=url, json_body={})
 
-    def _create_xunlei_token(self):
-        token = self.__xunlei_get_token.GetXunLeiToken(self.check_server_now())
-        return token
+    def _get_token(self):
+        current_version = self.check_server_version()
+        if self._check_version_at_lest(current_version, "1.21.1"):
+            return self._get_token_from_html()
+        return self._create_new_token()
 
-    def _post(self, url: str, json_body=None):
-        xtoken = self._create_xunlei_token()
+    def _create_new_token(self):
+        return self.__xunlei_get_token.GetXunLeiToken(self.check_server_now())
+
+    def _get_token_from_html(self):
+        resp = self._get(url="/webman/3rdparty/pan-xunlei-com/index.cgi/", with_auth=False)
+        uiauth = r"function uiauth(.*)}"
+        for script in re.findall(uiauth, resp):
+            script = "function uiauth%s}" % script
+            context = js2py.EvalJs()
+            context.execute(script)
+            return context.uiauth("any")
+        raise Exception("从 HTML 中获取 uiauth 失败")
+
+    def _post_as_json(self, url: str, json_body=None):
+        xtoken = self._get_token()
         headers = dict(**self.common_header)
         headers["pan-auth"] = xtoken
         url = f"{self.host}{url}{'?' if '?' not in url else '&'}pan_auth={xtoken}&device_space="
@@ -760,7 +798,7 @@ class NasXunleiProvider:
             params = {}
         headers = dict(**self.common_header)
         if with_auth:
-            xtoken = self._create_xunlei_token()
+            xtoken = self._get_token()
             params["pan_auth"] = xtoken
             headers["pan-auth"] = xtoken
         params["device_space"] = ""
@@ -768,7 +806,10 @@ class NasXunleiProvider:
             url=f"{self.host}{url}",
             params=params
         )
-        return self._as_checked_json(resp)
+        return str(resp)
+
+    def _get_as_json(self, url, params=None, with_auth=True):
+        return self._as_checked_json(self._get(url, params, with_auth))
 
     def _as_checked_json(self, result):
         if result is not None:
