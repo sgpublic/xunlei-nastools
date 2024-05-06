@@ -3,6 +3,7 @@ import json
 import os.path
 import re
 import sys
+import time
 from enum import Enum
 from types import SimpleNamespace
 
@@ -762,6 +763,8 @@ class NasXunleiProvider:
                 url = f"{url}&task_ids={id}"
             self._post_as_json(url=url, json_body={})
 
+    _token_time = 0
+    _token_str = None
     def _get_token(self):
         current_version = self.check_server_version()
         if self._check_version_at_lest(current_version, "1.21.1"):
@@ -772,13 +775,17 @@ class NasXunleiProvider:
         return self.__xunlei_get_token.GetXunLeiToken(self.check_server_now())
 
     def _get_token_from_html(self):
+        if int(time.time()) - self._token_time <= 60:
+            return self._token_str
         resp = self._get(url="/webman/3rdparty/pan-xunlei-com/index.cgi/", with_auth=False)
         uiauth = r"function uiauth(.*)}"
         for script in re.findall(uiauth, resp):
             script = "function uiauth%s}" % script
             context = js2py.EvalJs()
             context.execute(script)
-            return context.uiauth("any")
+            self._token_str = context.uiauth("any")
+            self._token_time = int(time.time())
+            return self._token_str
         raise Exception("从 HTML 中获取 uiauth 失败")
 
     def _post_as_json(self, url: str, json_body=None):
