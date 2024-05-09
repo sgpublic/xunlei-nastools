@@ -23,13 +23,13 @@
 
 ### 未来适配
 
-#### 1.18.0 及以下
+#### 3.18.0 及以下
 
 若提示签名失效，您可根据 [迅雷下载提供器安装和配置](https://github.com/opennaslab/kubespider/tree/f55eab6a931d1851d5cbe2b6467d7dde96bffdef/docs/zh/user_guide/thunder_install_config) 创建 `get_token.js` 文件，改名为 `xunlei_get_token.js` 并放入 nas-tools 配置文件夹中（与 `config.yaml` 同一目录），然后重启 nas-tools 即可。
 
-#### 1.21.1 及以上
+#### 3.21.0 及以上
 
-1.21.1 版本及以上 xunlei 直接生成一个 `pan_auth` 放到 html 里了，理论上不再需要操作 `get_token.js`，有效期待测试。
+3.21.0 版本及以上 xunlei 直接生成一个 `pan_auth` 放到 html 里了，理论上不再需要操作 `get_token.js`，有效期待测试。
 
 #### 其余版本
 

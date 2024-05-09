@@ -767,7 +767,7 @@ class NasXunleiProvider:
     _token_str = None
     def _get_token(self):
         current_version = self.check_server_version()
-        if self._check_version_at_lest(current_version, "1.21.1"):
+        if self._check_version_at_lest(current_version, "3.21.0"):
             return self._get_token_from_html()
         return self._create_new_token()
 
