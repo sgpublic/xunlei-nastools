@@ -845,7 +845,7 @@ class NasXunleiProvider:
         if str(port).isdigit():
             self.host = f"{self.host}:{port}"
         if username is not None and password is not None:
-            self.common_header["Authorization"] = base64.b64encode(f"{username}:{password}".encode('utf-8'))
+            self.common_header["Authorization"] = f"Basic {base64.b64encode(f'{username}:{password}'.encode('utf-8'))}"
         # https://github.com/opennaslab/kubespider/blob/f55eab6a931d1851d5cbe2b6467d7dde96bffdef/.config/dependencies/xunlei_download_provider/get_token.js
         xunlei_get_token = os.path.join(Config().get_config_path(), "xunlei_get_token.js")
         __xunlei_get_token_js_external = """
