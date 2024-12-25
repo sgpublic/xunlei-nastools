@@ -6,6 +6,7 @@ import sys
 import time
 from enum import Enum
 from types import SimpleNamespace
+from typing import Tuple, List
 
 import requests.models
 from dateutil import parser
@@ -437,21 +438,25 @@ class NasXunleiProvider:
         except Exception as e:
             raise Exception("迅雷获取服务器版本失败", e)
 
-    def _check_version_at_lest(self, current_version: str, target_version: str) -> bool:
+    @staticmethod
+    def _check_version_at_lest(current_version: str, target_version: str) -> bool:
         if current_version == target_version:
             return True
-        current_version = self._parse_version(current_version)
-        target_version = self._parse_version(target_version)
+        current_vers, current_n = NasXunleiProvider._parse_version(current_version)
+        target_vers, target_n = NasXunleiProvider._parse_version(target_version)
         index = 0
-        while True:
-            if len(current_version) <= index or len(target_version) <= index:
+        while index < current_n and index < target_n:
+            if current_vers[index] < target_vers[index]:
                 return False
-            if current_version[index] > target_version[index]:
+            if current_vers[index] > target_vers[index]:
                 return True
             index += 1
+        return current_n >= target_n
 
-    def _parse_version(self, version_name: str) -> list[int]:
-        return [int(x) for x in version_name.split('.')]
+    @staticmethod
+    def _parse_version(version_name: str) -> Tuple[List[int], int]:
+        vers = [int(x) for x in version_name.split('.')]
+        return vers, len(vers)
 
     def check_server_now(self) -> int:
         resp = self._get_as_json(url="/webman/3rdparty/pan-xunlei-com/index.cgi/device/now", with_auth=False)
